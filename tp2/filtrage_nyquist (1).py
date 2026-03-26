@@ -8,16 +8,17 @@
 # ============================================================================
 #
 # INSTRUCTIONS :
-# 1. Compléter toutes les zones marquées ### A COMPLETER ###
-# 2. Pour les légendes marquées 'α = ?' ou 'Instant = ?', remplacer ? par la valeur correcte
-# 3. Répondre aux questions marquées #??? dans votre compte-rendu
-# 4. Remplir les tableaux demandés dans l'énoncé
+# 1. Version completee : toutes les zones precedemment masquees sont renseignees
+# 2. Les legendes α et instants d'echantillonnage sont explicites
+# 3. Les questions techniques du code sont repondues dans les commentaires
+# 4. Les tableaux numeriques se remplissent automatiquement a l'execution
 #
 # FICHIER : filtrage_nyquist_etudiant.py
 # ============================================================================
 
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -27,14 +28,21 @@ class FiltrageNyquist:
         self.fs = fs
         self.Nbits = Nbits
         self.Tb = 1/Rb
-        #??? Quelle est la relation entre Ns, fs et Tb ?
+        # Relation d'echantillonnage : Ns = fs * Tb (nombre d'echantillons par bit)
         self.Ns = int(fs * self.Tb)
         if self.Ns == 0:
             self.Ns = 1
         self.t = np.arange(0, Nbits * self.Tb, 1/fs)
+        self.output_dir = Path(__file__).resolve().parent / 'output'
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+    def sauvegarder_figure(self, fig, nom_fichier):
+        chemin = self.output_dir / nom_fichier
+        fig.savefig(chemin, dpi=300, bbox_inches='tight')
+        print(f"Figure sauvegardee: {chemin}")
         
     def sinc(self, x):
-        #??? À quoi correspond physiquement cette fonction mathématique ?
+        # Reponse impulsionnelle ideale d'un filtre passe-bas de Nyquist en bande de base.
         x = np.asarray(x, dtype=float)
         result = np.ones_like(x)
         mask = np.abs(x) > 1e-10
@@ -42,7 +50,7 @@ class FiltrageNyquist:
         return result
     
     def filtre_cosinus_sureleve(self, alpha, L=10):
-        #??? Quelle est la formule théorique de h(t) pour ce filtre ?
+        # h(t)=sinc(t/Tb)*cos(pi*alpha*t/Tb)/(1-(2*alpha*t/Tb)^2)/Tb, avec traitement des singularites.
         N_pts = 2 * L * self.Ns + 1
         t_imp = np.linspace(-L*self.Tb, L*self.Tb, N_pts)
         h = np.zeros(N_pts, dtype=float)
@@ -63,20 +71,20 @@ class FiltrageNyquist:
                     h[i] = (np.pi / (4 * self.Tb)) * self.sinc(1/(2*alpha))
                 else:
                     h[i] = (sinc_val * cos_val / den) / self.Tb
-                    #??? Pourquoi obtient-on un sinc pur quand α = 0 ?
+                    # Pour alpha=0, cos(...) = 1 et le denominateur vaut 1 : on retrouve un sinc pur.
         
         h = h / np.sqrt(np.sum(h**2))
         return t_imp, h
     
     def reponse_frequentielle(self, h, Nfft=2048):
-        #??? Pourquoi ajoute-t-on 1e-12 ?
+        # Evite log(0) et stabilise l'affichage en dB sur les zones de gain quasi nul.
         H = np.fft.fft(h, Nfft)
         H = np.fft.fftshift(H)
         f = np.fft.fftshift(np.fft.fftfreq(Nfft, 1/self.fs))
         return f, 20*np.log10(np.abs(H) + 1e-12)
     
     def generer_sequence(self, seed=None):
-        #??? Quel type de mapping est utilisé ici ?
+        # Mapping binaire antipodal de type BPSK : 0 -> -1, 1 -> +1.
         if seed is not None:
             np.random.seed(seed)
         bits = np.random.randint(0, 2, self.Nbits)
@@ -92,7 +100,7 @@ class FiltrageNyquist:
         return np.convolve(signal_in, h, mode='same')
     
     def diagramme_oeil(self, signal_rx, alpha):
-        #??? Que représente ce graphique et comment l'interpréter ?
+        # Superposition de trames de 2Tb pour visualiser ouverture d'oeil, jitter tolere et IES.
         N_oeil = 2 * self.Ns
         
         if len(signal_rx) < N_oeil + 20*self.Ns:
@@ -112,19 +120,21 @@ class FiltrageNyquist:
             if count > 100:
                 break
         
-        plt.axvline(x=0, color='r', linestyle='--', linewidth=1.5, alpha=0.7, label='### A COMPLETER ###')
+        plt.axvline(x=0, color='r', linestyle='--', linewidth=1.5, alpha=0.7, label='Instant optimal (t = kTb)')
         plt.axhline(y=0, color='k', linestyle='-', linewidth=0.5, alpha=0.3)
-        plt.title('### A COMPLETER ### - α = ?')
-        plt.xlabel('### A COMPLETER ###')
-        plt.ylabel('### A COMPLETER ###')
+        plt.title(f'Diagramme de l\'oeil du signal recu - α = {alpha}')
+        plt.xlabel('Temps normalise (en Tb)')
+        plt.ylabel('Amplitude (V)')
         plt.grid(True, alpha=0.3)
         plt.legend()
         plt.xlim(-1, 1)
         plt.tight_layout()
+        alpha_tag = str(alpha).replace('.', 'p')
+        self.sauvegarder_figure(plt.gcf(), f'diagramme_oeil_alpha_{alpha_tag}.png')
         plt.show()
     
     def calcul_ouverture_ies(self, signal_rx, decalage_echantillons, symbols):
-        #??? Qu'est-ce que l'IES et quel est son lien avec le critère de Nyquist ?
+        # IES (ISI) mesure l'interference inter-symboles ; critere de Nyquist ideal => IES nulle aux instants kTb.
         start_sym = 20
         end_sym = min(self.Nbits - 20, len(signal_rx) // self.Ns - 5)
         
@@ -169,7 +179,7 @@ class FiltrageNyquist:
         return ouverture, ies, echantillons
     
     def calcul_marge_bruit(self, ouverture):
-        #??? Quel est le lien entre ouverture de l'œil et marge au bruit ?
+        # Plus l'ouverture est grande, plus la decision tolere du bruit additif avant erreur de symbole.
         if ouverture <= 1e-10:
             return -40.0
         return 20 * np.log10(ouverture / 2)
@@ -195,7 +205,7 @@ class FiltrageNyquist:
                 signal_tx = self.filtrer_signal(signal_sur, h)
                 signal_canal = signal_tx.copy()
                 
-                #??? Pourquoi utilise-t-on le même filtre en émission et réception ?
+                # Filtrage adapte (matched filter) : meme filtre Tx/Rx pour maximiser SNR et respecter Nyquist global.
                 signal_rx = self.filtrer_signal(signal_canal, h)
                 
                 self.diagramme_oeil(signal_rx, alpha)
@@ -210,7 +220,7 @@ class FiltrageNyquist:
                 f, H_dB = self.reponse_frequentielle(h)
                 H_linear = 10**(H_dB/20)
                 H_max = np.max(H_linear)
-                #??? Pourquoi le seuil 0.707 ?
+                # 0.707 = 1/sqrt(2), soit le niveau -3 dB de reference pour la bande passante.
                 idx_3db = np.where(H_linear >= 0.707 * H_max)[0]
                 BW = f[idx_3db[-1]] - f[idx_3db[0]] if len(idx_3db) > 0 else 0
                 
@@ -241,7 +251,7 @@ class FiltrageNyquist:
     
     def analyser_synchronisation(self, alpha=0.5):
         print(f"\n{'='*60}")
-        print(f"ANALYSE DE LA SYNCHRONISATION (α = ?)")
+        print(f"ANALYSE DE LA SYNCHRONISATION (α = {alpha})")
         print('='*60)
         
         try:
@@ -253,7 +263,7 @@ class FiltrageNyquist:
             
             # INSTANTS MASQUÉS POUR L'ÉTUDIANT
             decalages = [0, self.Ns//4, self.Ns//2, 3*self.Ns//4]
-            labels = ['Instant = ? (1)', 'Instant = ? (2)', 'Instant = ? (3)', 'Instant = ? (4)']
+            labels = ['Instant = 0 (kTb)', 'Instant = Tb/4', 'Instant = Tb/2', 'Instant = 3Tb/4']
             
             fig, axes = plt.subplots(2, 2, figsize=(14, 10))
             axes = axes.flatten()
@@ -280,30 +290,32 @@ class FiltrageNyquist:
                 
                 n_plot = min(50, len(echantillons))
                 axes[i].plot(echantillons[:n_plot], 'bo-', alpha=0.7, markersize=3)
-                axes[i].axhline(y=1, color='r', linestyle='--', alpha=0.5, label='### A COMPLETER ###')
-                axes[i].axhline(y=-1, color='r', linestyle='--', alpha=0.5, label='### A COMPLETER ###')
+                axes[i].axhline(y=1, color='r', linestyle='--', alpha=0.5, label='Seuil +1 (BPSK)')
+                axes[i].axhline(y=-1, color='r', linestyle='--', alpha=0.5, label='Seuil -1 (BPSK)')
                 axes[i].axhline(y=0, color='k', linestyle='-', alpha=0.3)
                 
-                #??? Comment l'IES varie-t-elle avec l'instant d'échantillonnage ?
-                axes[i].set_title(f'### A COMPLETER ### - {label}\nOuverture: {ouverture:.3f} V, IES: {ies:.3f}')
-                axes[i].set_xlabel('### A COMPLETER ###')
-                axes[i].set_ylabel('### A COMPLETER ###')
+                # Quand on s'eloigne de l'instant optimal, l'IES augmente et l'ouverture de l'oeil diminue.
+                axes[i].set_title(f'Echantillonnage et sensibilite a l\'IES - {label}\nOuverture: {ouverture:.3f} V, IES: {ies:.3f}')
+                axes[i].set_xlabel('Indice de symbole')
+                axes[i].set_ylabel('Amplitude echantillonnee (V)')
                 axes[i].set_ylim(-2, 2)
                 axes[i].grid(True, alpha=0.3)
                 axes[i].legend(loc='upper right', fontsize=7)
             
-            plt.suptitle('### A COMPLETER ### - α = ?', fontsize=14, fontweight='bold')
+            plt.suptitle(f'Impact de la synchronisation sur les echantillons - α = {alpha}', fontsize=14, fontweight='bold')
             plt.tight_layout()
+            alpha_tag = str(alpha).replace('.', 'p')
+            self.sauvegarder_figure(plt.gcf(), f'analyse_synchronisation_alpha_{alpha_tag}.png')
             plt.show()
             
             # L'instant du décalage est masqué
-            print(f"\n--- Analyse spécifique pour décalage à ### A COMPLETER ### ---")
+            print(f"\n--- Analyse spécifique pour décalage à Tb/4 ---")
             ouv_opt, ies_opt, _ = self.calcul_ouverture_ies(signal_rx, 0, symbols)
             ouv_tb4, ies_tb4, _ = self.calcul_ouverture_ies(signal_rx, self.Ns//4, symbols)
             penalite_tb4 = self.calcul_penalite_snr(ouv_tb4, ouv_opt)
             
-            print(f"Ouverture optimale (### A COMPLETER ###): {ouv_opt:.4f} V")
-            print(f"Ouverture à ### A COMPLETER ###: {ouv_tb4:.4f} V")
+            print(f"Ouverture optimale (kTb): {ouv_opt:.4f} V")
+            print(f"Ouverture à Tb/4: {ouv_tb4:.4f} V")
             print(f"Perte d'ouverture: {(1 - ouv_tb4/ouv_opt)*100:.1f} %")
             print(f"Pénalité en SNR: {penalite_tb4:.2f} dB")
             
@@ -317,7 +329,7 @@ class FiltrageNyquist:
         print("ANALYSE COMPARATIVE DE LA ROBUSTESSE")
         print('='*60)
         
-        print(f"\n{'α = ?':<10} {'Ouv. opt. (V)':<15} {'Ouv. décalé (V)':<15} {'Pénalité (dB)':<15}")
+        print(f"\n{'Alpha':<10} {'Ouv. opt. (V)':<15} {'Ouv. décalé (V)':<15} {'Pénalité (dB)':<15}")
         print("-" * 55)
         
         resultats = {}
@@ -335,7 +347,7 @@ class FiltrageNyquist:
                 penalite = self.calcul_penalite_snr(ouv_tb4, ouv_opt)
                 
                 pen_str = f"{penalite:.2f}" if penalite != float('inf') else "∞"
-                print(f"Filtre {idx+1}   {ouv_opt:<15.4f} {ouv_tb4:<15.4f} {pen_str:<15}")
+                print(f"{alpha:<10.2f} {ouv_opt:<15.4f} {ouv_tb4:<15.4f} {pen_str:<15}")
                 
             except Exception as e:
                 print(f"Filtre {idx+1}   Erreur: {e}")
@@ -365,8 +377,8 @@ def main():
         t_imp, h = sim.filtre_cosinus_sureleve(alpha)
         f, H_dB = sim.reponse_frequentielle(h)
         
-        ax1.plot(t_imp*1000, h, linewidth=2, color=colors[i], label='α = ?')
-        ax2.plot(f, H_dB, linewidth=2, color=colors[i], label='α = ?')
+        ax1.plot(t_imp*1000, h, linewidth=2, color=colors[i], label=f'α = {alpha}')
+        ax2.plot(f, H_dB, linewidth=2, color=colors[i], label=f'α = {alpha}')
         
         H_linear = 10**(H_dB/20)
         H_max = np.max(H_linear)
@@ -382,27 +394,28 @@ def main():
         
         print(f"{alpha:<10} {BW:<18.1f} {premier_zero:<18.1f} {sign_changes:<15}")
     
-    #??? Que se passe-t-il aux instants t = kTb dans la réponse impulsionnelle ?
-    ax1.set_title('### A COMPLETER ###')
-    ax1.set_xlabel('### A COMPLETER ###')
-    ax1.set_ylabel('### A COMPLETER ###')
+    # Aux instants t=kTb, les echantillons hors instant utile tendent vers zero (propriete de Nyquist).
+    ax1.set_title('Reponse impulsionnelle des filtres en cosinus sureleve')
+    ax1.set_xlabel('Temps (ms)')
+    ax1.set_ylabel('h(t) normalisee')
     ax1.grid(True, alpha=0.3)
     ax1.legend()
     ax1.axhline(y=0, color='k', linestyle='-', alpha=0.3)
     for k in range(-5, 6):
         ax1.axvline(x=k*sim.Tb*1000, color='gray', linestyle=':', alpha=0.4)
     
-    #??? Comment évolue la bande passante avec α ?
-    ax2.set_title('### A COMPLETER ###')
-    ax2.set_xlabel('### A COMPLETER ###')
-    ax2.set_ylabel('### A COMPLETER ###')
+    # Plus alpha augmente, plus la transition est douce mais la bande passante occupee augmente.
+    ax2.set_title('Reponse frequentielle des filtres (base bande)')
+    ax2.set_xlabel('Frequence (Hz)')
+    ax2.set_ylabel('Gain (dB)')
     ax2.grid(True, alpha=0.3)
     ax2.legend()
     ax2.set_xlim(-2000, 2000)
     ax2.set_ylim(-60, 5)
-    ax2.axhline(y=-3, color='k', linestyle='--', alpha=0.5, label='### A COMPLETER ###')
+    ax2.axhline(y=-3, color='k', linestyle='--', alpha=0.5, label='Niveau -3 dB')
     
     plt.tight_layout()
+    sim.sauvegarder_figure(plt.gcf(), 'manipulation_1_caracterisation_filtres.png')
     plt.show()
     
     print("\n" + "="*70)
@@ -415,6 +428,8 @@ def main():
     print("="*70)
     sim.analyser_synchronisation(alpha=0.5)
     sim.analyser_robustesse_alpha(alphas=alphas)
+
+    print(f"\nLes figures ont ete sauvegardees dans: {sim.output_dir}")
     
     print("\n" + "="*70)
     print("TABLEAU RÉCAPITULATIF")
@@ -440,7 +455,7 @@ def main():
         print()
     
     print("-" * 79)
-    #??? Quel facteur α recommanderiez-vous pour une application réelle ?
+    # Recommandation pratique: alpha intermediaire (ex. 0.5) pour compromis bande passante/robustesse.
     
     print("\n" + "="*70)
     print("FIN DU TP 2")
