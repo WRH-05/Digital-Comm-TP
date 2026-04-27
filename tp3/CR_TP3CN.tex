@@ -1,5 +1,5 @@
 % tp2.tex
-\documentclass[10pt,a4paper,twocolumn]{article}
+\documentclass[11pt,a4paper,twocolumn]{article}
 
 % Paramètres de langue et d'encodage
 \usepackage[utf8]{inputenc}
@@ -184,21 +184,27 @@ Ces extraits sont suffisants pour comprendre la façon dont le bruit est appliqu
 \section*{Résultats}
 Les figures suivantes résument les résultats demandés : signaux modulés dans le domaine temporel et constellations bruitées pour différents niveaux d'Eb/N0. Les images ont été générées par le script fourni.
 
-\begin{figure*}[ht]
+La première figure montre que les modulations ASK/OOK et BPSK sont directement visibles par alternance d'amplitude ou de signe sur la porteuse, alors que les modulations en quadrature présentent une combinaison des composantes I et Q. Cette étape sert surtout à vérifier que les signaux sont bien construits avant d'étudier les constellations.
+
+\begin{figure*}[t]
 \centering
-\includegraphics[width=0.90\textwidth]{01_signaux_modules.png}
+\includegraphics[width=0.95\textwidth]{01_signaux_modules.png}
 \caption{Signaux modulés (fenêtre temporelle de 20 bits) pour les cinq modulations étudiées.}
 \end{figure*}
 
-\begin{figure*}[ht]
+Les constellations bruitées permettent de visualiser la sensibilité de chaque modulation. Pour Eb/N0 faible, les points se recouvrent davantage et les zones de décision deviennent incertaines. Pour Eb/N0 plus élevé, les nuages de points se recentrent autour des symboles idéaux.
+
+\begin{figure*}[t]
 \centering
-\includegraphics[width=0.90\textwidth]{02_constellations_bruit.png}
+\includegraphics[width=0.95\textwidth]{02_constellations_bruit.png}
 \caption{Constellations bruitées pour Eb/N0 = 0, 5, 10, 15 dB (colonnes). Chaque ligne correspond à une modulation.}
 \end{figure*}
 
-\begin{figure*}[ht]
+La comparaison finale confirme que les modulations à grand nombre d'états sont les plus fragiles. À titre d'exemple, le 64-QAM garde une bonne efficacité spectrale, mais il exige un canal plus propre que le BPSK ou le QPSK. Cette différence est exactement celle que l'on attend en communications numériques.
+
+\begin{figure*}[t]
 \centering
-\includegraphics[width=0.90\textwidth]{03_comparaison_bruit.png}
+\includegraphics[width=0.95\textwidth]{03_comparaison_bruit.png}
 \caption{Comparaison de l'effet du bruit sur les modulations pour plusieurs valeurs d'Eb/N0.}
 \end{figure*}
 
@@ -210,6 +216,8 @@ L'effet du bruit est très visible sur les constellations : pour Eb/N0 faible, l
 Sur les signaux temporels, on remarque aussi que les modulations à amplitude variable présentent des enveloppes plus contrastées. ASK/OOK utilise directement la présence ou l'absence de porteuse, alors que BPSK change seulement le signe de la porteuse. Les QAM combinent les composantes en phase et en quadrature, ce qui explique la densité plus importante des points sur le plan I/Q.
 
 En pratique, les figures confirment que la montée en ordre de modulation améliore la quantité d'information transmise par symbole, mais dégrade la tolérance au bruit. Le choix d'une modulation dépend donc du compromis entre robustesse, débit et largeur de bande disponible.
+
+Une autre observation est que le bruit ajouté dans le script est gaussien et indépendant sur les composantes réelle et imaginaire pour les symboles complexes. Cela correspond bien au modèle classique de canal AWGN utilisé dans les premiers travaux pratiques de communication numérique.
 
 \section*{Conclusion}
 Le TP a permis de vérifier expérimentalement les différences de robustesse au bruit entre schémas de modulation et de se familiariser avec la simulation temps-fréquence et l'affichage des constellations. Le code fourni est suffisant pour reproduire les expériences et peut être étendu pour estimer le taux d'erreur binaire (BER) empirique.
